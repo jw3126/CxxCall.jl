@@ -1,0 +1,13 @@
+name = "CxxCall"
+uuid = "dbaf2c2e-b61b-429c-b386-57175d7288fb"
+authors = ["Jan Weidner <jw3126@gmail.com> and contributors"]
+version = "0.1.0"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+julia = "1"
+
+[targets]
+test = ["Test"]
