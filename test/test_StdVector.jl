@@ -32,22 +32,22 @@ module Wrapper
     
     for T in (Float32,)
         vectorT = cxxtypename(StdVector{T})
-        @cxx function lib.foo()::StdVector{T}
+        @cxx lib function foo()::StdVector{T}
             """
             $(vectorT) ret = new $(destar(vectorT))();
             return ret;
             """
         end
-        @cxx function lib.free(self::StdVector{T})::Nothing
+        @cxx lib function free(self::StdVector{T})::Nothing
             "delete self;"
         end
-        @cxx function lib.at(self::StdVector{T}, i::Csize_t)::T
+        @cxx lib function at(self::StdVector{T}, i::Csize_t)::T
             "return self->at(i);"
         end
-        @cxx function lib.push_back!(self::StdVector{T}, val::T)::Nothing
+        @cxx lib function push_back!(self::StdVector{T}, val::T)::Nothing
             "self->push_back(val);"
         end
-        @cxx function lib.len(self::StdVector{T})::Int64
+        @cxx lib function len(self::StdVector{T})::Int64
             "return self->size();"
         end
     end

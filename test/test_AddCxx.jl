@@ -11,7 +11,7 @@ module Wrapper
     #include <iostream>
     """))
     
-    @cxx function lib.add(x::Cint, y::Cint)::Cfloat
+    @cxx lib function add(x::Cint, y::Cint)::Cfloat
         """
         float ret = x + y;
         std::cout << "Welcome to libAddCxx" << std::endl;
@@ -20,7 +20,7 @@ module Wrapper
         """
     end
 
-    @cxx function lib.add_sloppy(x::Convert(Any=>Cint), y::Convert(Int64=>Cint))::Cfloat
+    @cxx lib function add_sloppy(x::Convert(Any=>Cint), y::Convert(Int64=>Cint))::Cfloat
         """
         float ret = x + y;
         return ret;

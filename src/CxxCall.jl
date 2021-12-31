@@ -22,21 +22,11 @@ function parse_call(ex)
     if Meta.isexpr(ex, :call)
         @assert length(ex.args) >= 1
         args_ann = copy(ex.args)
-        f = popfirst!(args_ann)
-        if Meta.isexpr(f, Symbol("."))
-            @assert length(f.args) == 2
-            lib, fun = f.args
-        else
-            msg = """
-            Expected a calle of the form `lib.f`. Got:
-            $f
-            """
-            throw(ArgumentError(msg))
-        end
+        fun = popfirst!(args_ann)
         args = map(args_ann) do arg_ann
             parse_type_annotation(arg_ann)
         end
-        return (;lib, fun, args)
+        return (;fun, args)
     else
         msg = """
         Expected function call. Got:
@@ -91,10 +81,9 @@ function make_cxxfunction(fun, lib, return_type, args, anns, body)
     )
 end
 
-function cxxexprmacro(ex)
+function cxxexprmacro(lib, ex)
     def = parse_fdef(ex)
-    fun = def.fun
-    lib = def.lib
+    fun = QuoteNode(def.fun)
     return_type = def.return_type
     args = Expr(:ref, :Symbol,
         map(arg->QuoteNode(arg.val), def.args)...
@@ -108,12 +97,12 @@ function cxxexprmacro(ex)
     )
 end
 
-function cxxmacro(ex)
-    Expr(:call, :eval, cxxexprmacro(ex))
+function cxxmacro(lib, ex)
+    Expr(:call, :eval, cxxexprmacro(lib, ex))
 end
 
-macro cxx(ex)
-    esc(cxxmacro(ex))
+macro cxx(lib, ex)
+    esc(cxxmacro(lib, ex))
 end
 
 struct ArgAnn
