@@ -9,7 +9,7 @@
 ```julia
 using CxxCall
 ...
-@cxx function mylib.add(x::Cint, y::Cint)::Cfloat
+@cxx mylib function add(x::Cint, y::Cint)::Cfloat
     """
     float ret = x + y;
     std::cout << "Welcome to libAddCxx" << std::endl;
