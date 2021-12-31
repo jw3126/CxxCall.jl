@@ -30,7 +30,7 @@ module Wrapper
     for T in (Float32,Float64)
         vectorT = cxxtypename(StdVector{T})
         StdVector{T}() = new_StdVector(T)
-        @cxx lib function new_StdVector(_::Type{T})::StdVector{T}
+        @cxx lib function new_StdVector(::Type{T})::StdVector{T}
             """
             return new $(destar(vectorT))();
             """

@@ -51,8 +51,13 @@ end
 function parse_type_annotation(ex)
     # t :: T
     if Meta.isexpr(ex, Symbol("::"))
-        @assert length(ex.args) == 2
-        val, ann = ex.args
+        if length(ex.args) == 1
+            val = nothing
+            ann = only(ex.args)
+        else
+            @assert length(ex.args) == 2
+            val, ann = ex.args
+        end
         return (;val, ann)
     else
         msg = """
@@ -77,12 +82,12 @@ function parse_call_with_rettype(ex)
     end
 end
 
+const SALT = "tR8P"
 function make_cname(fun, res::FnResult, args::Vector{FnArg})
-    salt = "tR8P"
     io = IOBuffer()
     print(io, cxxname(string(fun)))
     print(io, "_")
-    print(io, salt)
+    print(io, SALT)
     print(io, "_")
     print(io, cxxname(res.cxx_type))
     for arg in args
@@ -114,8 +119,15 @@ function cxxexprmacro(lib, ex)
         QuoteNode(def.fun)
     end
     return_type = def.return_type
+
     args = Expr(:ref, :Symbol,
-        map(arg->QuoteNode(arg.val), def.args)...
+        map(eachindex(def.args), def.args) do i, arg
+            if arg.val === nothing
+                QuoteNode(Symbol("_", SALT, "_", i))
+            else
+                QuoteNode(arg.val)
+            end
+        end...
     )
     anns = Expr(:vect,
         map(arg->arg.ann, def.args)...
@@ -218,11 +230,12 @@ function ArgAnn(julia_type::Type)
     )
 end
 
-function destar(s::AbstractString)
+function destar(str::AbstractString)
+    s = rstrip(str)
     if isempty(s)
         throw(ArgumentError("Nonempty string expected"))
     elseif s[end] === '*'
-        s[begin:end-1]
+        rstrip(s[begin:end-1])
     else
         throw(ArgumentError("Expected last character to be '*', got:\n$s"))
     end
