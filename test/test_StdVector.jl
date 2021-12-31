@@ -51,7 +51,7 @@ module Wrapper
 end#module Wrapper
 
 using Test
-import .Wrapper as W
+import .Wrapper; const W = Wrapper
 
 @testset "StdVector" begin
     @test !ispath(W.filepath)
