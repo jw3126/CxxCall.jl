@@ -4,6 +4,18 @@ using CxxInterface
 export cxxsetup, cxxnewfile
 export cxxtypename
 
+# compat
+
+if !isdefined(Base, :Returns)
+    function Returns(x)
+        function returns(args...; kw...)
+            x
+        end
+    end
+end
+
+# parser
+
 function parse_fdef(ex)
     if Meta.isexpr(ex, :function)
         @assert length(ex.args) == 2
