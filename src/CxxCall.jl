@@ -2,6 +2,7 @@ module CxxCall
 export @cxx
 using CxxInterface
 export cxxsetup, cxxnewfile
+export cxxtypename
 
 function parse_fdef(ex)
     if Meta.isexpr(ex, :function)
@@ -74,85 +75,133 @@ function parse_call_with_rettype(ex)
     end
 end
 
-function make_cname(def)
-    string(def.fun)
+function make_cname(fun)
+    salt = "tR8P"
+    cxxname(string(fun, "_", salt))
 end
 
-function eval_def(M::Module, def)
-    fun = M.eval(def.fun)
-    if !(fun isa Symbol)
-        msg = """
-        Function name must be a Symbol. Got:
-        $(fun)
-        """
-        throw(ArgumentError(msg))
-    end
-    lib = M.eval(def.lib)
-    if !(lib isa AbstractString)
-        msg = """
-        Library must be an AbstractString. Got:
-        $lib
-        """
-        throw(ArgumentError(msg))
-    end
-    args = map(def.args) do arg
-        val = arg.val
-        if !(val isa Symbol)
-            msg = """
-            All arguments must be symbols. Got:
-            $val
-            """
-            throw(ArgumentError(msg))
-        end
-        ann = M.eval(arg.ann)
-        (;val, ann)
-    end
-    body = M.eval(def.body)
-    if !(body isa AbstractString)
-        msg = """
-        Function body must be a String. Got:
-        $body
-        """
-        throw(ArgumentError(msg))
-    end
-    return_type = M.eval(def.return_type)
-    return (;lib, fun, args, return_type, body)
-end
-
-function cxxmacro(M::Module, ex)
-    def = eval_def(M,parse_fdef(ex))
+function make_cxxfunction(fun, lib, return_type, args, anns, body)
     cxxfunction(
-        FnName(def.fun::Symbol, make_cname(def)::String, def.lib),
-        FnResult(def.return_type, cxxname(cxxtype[def.return_type])),
-        map(def.args) do arg
-            CT = cxxname(cxxtype[arg.ann])
-            FnArg(arg.val::Symbol, arg.ann, string(arg.val), CT, Any, identity)
+        FnName(fun, make_cname(fun), lib),
+        FnResult(return_type, cxxtypename(return_type)),
+        map(args, anns) do arg, ann
+            FnArg(arg, ArgAnn(ann))
         end,
-        def.body::String,
+        body,
     )
 end
 
-macro cxx(ex)
-    esc(cxxmacro(__module__, ex))
+function cxxexprmacro(ex)
+    def = parse_fdef(ex)
+    fun = def.fun
+    lib = def.lib
+    return_type = def.return_type
+    args = Expr(:ref, :Symbol,
+        map(arg->QuoteNode(arg.val), def.args)...
+    )
+    anns = Expr(:vect,
+        map(arg->arg.ann, def.args)...
+    )
+    body = def.body
+    Expr(:call, make_cxxfunction,
+         fun, lib, return_type, args, anns, body
+    )
 end
 
-# struct Arg
-#     julia_type::Type
-#     cxx_type::AbstractString
-#     initial_julia_type::Type
-#     convert_from_initial::Any
-#     skip::Bool
-# end
-# 
-# function CxxInterface.FnArg(name::Symbol, arg::Arg)
-#     FnArg(arg.julia_name, 
-#           arg.julia_type, 
-#           string(name), 
-#           arg.cxxtype,
-#           arg.initial_julia_type,
-#           arg.convert_from_initial,
-#           arg.skip,
-#     )
-# end
+function cxxmacro(ex)
+    Expr(:call, :eval, cxxexprmacro(ex))
+end
+
+macro cxx(ex)
+    esc(cxxmacro(ex))
+end
+
+struct ArgAnn
+    julia_type::Type
+    cxx_type::AbstractString
+    initial_julia_type::Type
+    convert_from_initial::Any
+    skip::Bool
+end
+ArgAnn(o::ArgAnn) = o
+
+function CxxInterface.FnArg(julia_name::Symbol, arg::ArgAnn)
+    cxx_name = string(julia_name)
+    FnArg(julia_name, 
+          arg.julia_type, 
+          cxx_name,
+          arg.cxx_type,
+          arg.initial_julia_type,
+          arg.convert_from_initial,
+          ;arg.skip,
+    )
+end
+
+"""
+    cxxtypename(::Type{MyJuliaType})::AbstractString
+
+Return the corresponding C++ type as a string from the julia type.
+```jldoctest
+julia> using CxxCall: cxxtypename
+
+julia> cxxtypename(Float64)
+"double"
+
+julia> cxxtypename(Int8)
+"int8_t"
+```
+"""
+function cxxtypename end
+cxxtypename(::Type{Nothing}) = "void"
+
+export Convert
+struct Convert{From,To} end
+function (o::Convert{From,To})(expr) where {From,To}
+    :(convert($To,$expr::$From))
+end
+function from_to(::Convert{From,To}) where {From, To}
+    From, To
+end
+function Convert(from_to::Pair)
+    From, To = from_to
+    Convert{From, To}()
+end
+
+
+function ArgAnn(convert_from_initial::Convert)
+    initial_julia_type, julia_type = from_to(convert_from_initial)
+    cxx_type = cxxtypename(julia_type)
+    convert_from_initial = Convert{initial_julia_type, julia_type}()
+    ArgAnn(julia_type,
+        cxx_type,
+        initial_julia_type,
+        convert_from_initial,
+        false
+    )
+end
+
+function ArgAnn(julia_type::Type)
+    cxx_type = cxxtypename(julia_type)
+    ArgAnn(julia_type,
+        cxx_type,
+        julia_type,
+        identity,
+        false
+    )
+end
+
+function destar(s::AbstractString)
+    if isempty(s)
+        throw(ArgumentError("Nonempty string expected"))
+    elseif s[end] === '*'
+        s[begin:end-1]
+    else
+        throw(ArgumentError("Expected last character to be '*', got:\n$s"))
+    end
+end
+
+for (julia_type, cxx_type) in pairs(cxxtype)
+    @eval cxxtypename(::Type{$julia_type}) = $cxx_type
+end
 
 end

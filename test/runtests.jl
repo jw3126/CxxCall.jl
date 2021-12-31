@@ -1,6 +1,9 @@
 import CxxCall
 using Test
 
+include("test_AddCxx.jl")
+include("test_StdVector.jl")
+
 @testset "parse_fdef" begin
     parse_fdef = CxxCall.parse_fdef
     ex1 = :(function M.f()::Res
@@ -32,4 +35,3 @@ using Test
     ]
 end
 
-include("test_AddCxx.jl")

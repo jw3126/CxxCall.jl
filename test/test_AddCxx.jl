@@ -19,6 +19,13 @@ module Wrapper
         return ret;
         """
     end
+
+    @cxx function lib.add_sloppy(x::Convert(Any=>Cint), y::Convert(Int64=>Cint))::Cfloat
+        """
+        float ret = x + y;
+        return ret;
+        """
+    end
 end#module Wrapper
 
 using Test
@@ -32,6 +39,10 @@ run(`g++ -shared -fPIC $(Wrapper.filepath) -o $libpath`)
 @test isfile(libpath)
 using Libdl
 dlopen(libpath)
-@test Wrapper.add(1,2) === 3f0
+@test Wrapper.add(Cint(1),Cint(2)) === 3f0
+@test_throws MethodError Wrapper.add(Int64(1),Cint(2)) === 3f0
+@test Wrapper.add_sloppy(Int128(1), Int64(2)) === 3f0
+@test Wrapper.add_sloppy(Float16(1), Int64(2)) === 3f0
+@test_throws MethodError Wrapper.add_sloppy(Float16(1), Int32(2)) === 3f0
 
 end#module
