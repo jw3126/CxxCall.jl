@@ -65,25 +65,42 @@ function parse_call_with_rettype(ex)
     end
 end
 
-function make_cname(fun)
+function make_cname(fun, res::FnResult, args::Vector{FnArg})
     salt = "tR8P"
-    cxxname(string(fun, "_", salt))
+    io = IOBuffer()
+    print(io, cxxname(string(fun)))
+    print(io, "_")
+    print(io, salt)
+    print(io, "_")
+    print(io, cxxname(res.cxx_type))
+    for arg in args
+        print(io, "_")
+        print(io, cxxname(arg.cxx_type))
+    end
+    seekstart(io)
+    read(io, String)
 end
 
 function make_cxxfunction(fun, lib, return_type, args, anns, body)
-    cxxfunction(
-        FnName(fun, make_cname(fun), lib),
-        FnResult(return_type, cxxtypename(return_type)),
-        map(args, anns) do arg, ann
-            FnArg(arg, ArgAnn(ann))
-        end,
-        body,
-    )
+    fres = FnResult(return_type, cxxtypename(return_type))
+    fargs = map(args, anns) do arg, ann
+        FnArg(arg, ArgAnn(ann))
+    end
+    cxx_fun_name = make_cname(fun, fres, fargs)
+    fname = FnName(fun, cxx_fun_name, lib)
+    cxxfunction(fname, fres, fargs, body)
 end
 
 function cxxexprmacro(lib, ex)
     def = parse_fdef(ex)
-    fun = QuoteNode(def.fun)
+    fun = if Meta.isexpr(def.fun, :curly)
+        # error("Function names with curly brackets Foo{T} are currently not supported.")
+        # the problem is that these usually are Type{...} but CxxInterface only supports
+        # Union{Symbol, Expr}
+        Expr(:block, def.fun)
+    else
+        QuoteNode(def.fun)
+    end
     return_type = def.return_type
     args = Expr(:ref, :Symbol,
         map(arg->QuoteNode(arg.val), def.args)...
@@ -92,9 +109,10 @@ function cxxexprmacro(lib, ex)
         map(arg->arg.ann, def.args)...
     )
     body = def.body
-    Expr(:call, make_cxxfunction,
+    ret = Expr(:call, make_cxxfunction,
          fun, lib, return_type, args, anns, body
     )
+    ret
 end
 
 function cxxmacro(lib, ex)
@@ -141,7 +159,7 @@ julia> cxxtypename(Int8)
 ```
 """
 function cxxtypename end
-cxxtypename(::Type{Nothing}) = "void"
+cxxtypename(::Type{Cvoid}) = "void"
 
 export Convert
 struct Convert{From,To} end
@@ -156,7 +174,6 @@ function Convert(from_to::Pair)
     Convert{From, To}()
 end
 
-
 function ArgAnn(convert_from_initial::Convert)
     initial_julia_type, julia_type = from_to(convert_from_initial)
     cxx_type = cxxtypename(julia_type)
@@ -165,6 +182,16 @@ function ArgAnn(convert_from_initial::Convert)
         cxx_type,
         initial_julia_type,
         convert_from_initial,
+        false
+    )
+end
+
+function ArgAnn(julia_type::Type{Type{T}}) where {T}
+    cxx_type = "void*"
+    ArgAnn(Ptr{Cvoid},
+        cxx_type,
+        julia_type,
+        Returns(:(C_NULL)),
         false
     )
 end
