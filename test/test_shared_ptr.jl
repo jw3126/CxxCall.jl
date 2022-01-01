@@ -14,11 +14,9 @@ module Wrapper
         int value;
         int deaths;
         S(int x) : value(x), deaths(0){
-        std::cout << "construct S(" << value << ")" << std::endl;
         }
         ~S() {
             deaths += 1;
-            std::cout << "delete S(" << value << ")" << "(" << deaths << " deaths)" << std::endl;
         }
     };
 
