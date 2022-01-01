@@ -17,7 +17,7 @@ end
 # parser
 
 function parse_fdef(ex)
-    if Meta.isexpr(ex, :function)
+    if Meta.isexpr(ex, :function) || Meta.isexpr(ex, Symbol("="))
         @assert length(ex.args) == 2
         ann_call, body = ex.args
         (;parse_call_with_rettype(ann_call)..., body)
@@ -228,6 +228,10 @@ function ArgAnn(julia_type::Type)
         identity,
         false
     )
+end
+
+function cxxtypename(::Type{Ptr{T}}) where {T}
+    cxxtypename(T) * "*"
 end
 
 function destar(str::AbstractString)

@@ -4,9 +4,6 @@ module Wrapper
     using CxxCall
     using CxxCall: destar
     dir = mktempdir()
-    dir = "debug"
-    rm(dir, force=true, recursive=true)
-    mkpath(dir)
     lib = joinpath(dir, "libStdVectorCxx")
     filepath = joinpath(dir, "StdVectorCxx.cxx")
     eval(cxxsetup())
@@ -26,8 +23,7 @@ module Wrapper
         at(o, Csize_t(i-1))
     end
 
-    # TODO more conventient constructors
-    for T in (Float32,Float64)
+    for T in (Float32,Float64,Bool)
         vectorT = cxxtypename(StdVector{T})
         StdVector{T}() = new_StdVector(T)
         @cxx lib function new_StdVector(::Type{T})::StdVector{T}
