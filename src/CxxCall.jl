@@ -29,7 +29,7 @@ function parse_fdef(ex)
         (;parse_call_with_rettype(ann_call)..., body)
     else
         msg = """
-        Expected a long form function definition. Got:
+        Expected a function definition. Got:
         $(ex)
         """
         throw(ArgumentError(msg))
