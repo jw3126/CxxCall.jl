@@ -30,19 +30,22 @@ end#module Wrapper
 
 using Test
 import .Wrapper
-
-@test !ispath(Wrapper.filepath)
-Wrapper.cxx_write_code!()
-@test isfile(Wrapper.filepath)
-libpath = Wrapper.lib * ".so"
-run(`g++ -shared -fPIC $(Wrapper.filepath) -o $libpath`)
-@test isfile(libpath)
 using Libdl
-dlopen(libpath)
-@test Wrapper.add(Cint(1),Cint(2)) === 3f0
-@test_throws MethodError Wrapper.add(Int64(1),Cint(2)) === 3f0
-@test Wrapper.add_sloppy(Int128(1), Int64(2)) === 3f0
-@test Wrapper.add_sloppy(Float16(1), Int64(2)) === 3f0
-@test_throws MethodError Wrapper.add_sloppy(Float16(1), Int32(2)) === 3f0
+
+@testset "AddCxx" begin
+    @test !ispath(Wrapper.filepath)
+    Wrapper.cxx_write_code!()
+    @test isfile(Wrapper.filepath)
+    libpath = "$(Wrapper.lib).$dlext"
+    run(`g++ -shared -fPIC $(Wrapper.filepath) -o $libpath`)
+    @test isfile(libpath)
+    dlopen(libpath)
+    @test Wrapper.add(Cint(1),Cint(2)) === 3f0
+    @test_throws MethodError Wrapper.add(Int64(1),Cint(2)) === 3f0
+    @test Wrapper.add_sloppy(Int128(1), Int64(2)) === 3f0
+    @test Wrapper.add_sloppy(Float16(1), Int64(2)) === 3f0
+    @test_throws MethodError Wrapper.add_sloppy(Float16(1), Int32(2)) === 3f0
+end
 
 end#module
+

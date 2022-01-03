@@ -88,8 +88,12 @@ function parse_call_with_rettype(ex)
     end
 end
 
-const SALT = "tR8P"
+const SALT = "tR8l"
 function make_cname(fun, res::FnResult, args::Vector{FnArg})
+    # TODO 
+    # This is hacky. Some problems are:
+    # * function names can get very long. We could use a hash to shorten them.
+    # * distinct initial_julia_type can give the same C++ type, which gives name clashes
     io = IOBuffer()
     print(io, cxxname(string(fun)))
     print(io, "_")
@@ -268,6 +272,9 @@ ArgAnn(julia_type::Type{Cstring}) = arg_ann_cstring(Cstring)
 ArgAnn(julia_type::Type{Cwstring}) = arg_ann_cstring(Cwstring)
 
 function tocxx(::Type{Ptr{T}}) where {T}
+    # TODO
+    # certainly this works for simple cases
+    # but is it always correct?
     tocxx(T) * "*"
 end
 
@@ -287,7 +294,7 @@ const cxxtype_patched = merge(cxxtype,
     Dict(
         Cvoid    => "void",
         Cstring  => "char*",
-        Cwstring => "wchar*",
+        Cwstring => "wchar_t*",
     )
 )
 

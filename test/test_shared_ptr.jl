@@ -72,50 +72,11 @@ module Wrapper
     @cxx lib function use_count(self::Ptr{ShareHolder})::Clong
         "return self->s.use_count();"
     end
-
-
-    #     @cxx lib function new_SharedPtr(::Type{T})::SharedPtr{T}
-    #         """
-    #         return new $(destar(tocxx(SharedPtr{T}))) (nullptr);
-    #         """
-    #     end
-    #     @cxx lib function reset(self::SharedPtr{T}, t::T)::Cvoid
-    #         """
-    #         self->reset(t);
-    #         """
-    #     end
-
-    #     ptr::Ptr{SharedPtr{T}}
-    # end
-    # function SharedPtr{T}(t::T) where {T}
-    #     ret = new_SharedPtr(T);
-    #     reset(ret, t)
-    # end
-    # function CxxCall.tocxx(::Type{SharedPtr{T}}) where {T}
-    #     "std::shared_ptr<$(destar(tocxx(T)))>*"
-    # end
-    # for T in [S]
-    #     @cxx lib function new_SharedPtr(::Type{T})::SharedPtr{T}
-    #         """
-    #         return new $(destar(tocxx(SharedPtr{T}))) (nullptr);
-    #         """
-    #     end
-    #     @cxx lib function reset(self::SharedPtr{T}, t::T)::Cvoid
-    #         """
-    #         self->reset(t);
-    #         """
-    #     end
-    #     @cxx lib function free(self::SharedPtr{T})::Cvoid
-    #         """
-    #         delete self;
-    #         """
-    #     end
-    # end
-
 end#module Wrapper
 
 using Test
 import .Wrapper; const W = Wrapper
+@testset "shared_ptr" begin
     @test !ispath(W.filepath)
     W.cxx_write_code!()
     @test isfile(W.filepath)
@@ -142,4 +103,5 @@ import .Wrapper; const W = Wrapper
     @test W.use_count(holder2) == 1
     @test W.get_deaths(holder2) == 0
     W.free(holder2)
+end
 end#module

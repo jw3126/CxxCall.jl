@@ -20,15 +20,17 @@ end#module Wrapper
 
 using Test
 import .Wrapper
-
-@test !ispath(Wrapper.filepath)
-Wrapper.cxx_write_code!()
-@test isfile(Wrapper.filepath)
-libpath = Wrapper.lib * ".so"
-run(`g++ -shared -fPIC $(Wrapper.filepath) -o $libpath`)
-@test isfile(libpath)
 using Libdl
-dlopen(libpath)
-Wrapper.hello("world")
+
+@testset "hello_world" begin
+    @test !ispath(Wrapper.filepath)
+    Wrapper.cxx_write_code!()
+    @test isfile(Wrapper.filepath)
+    libpath = "$(Wrapper.lib).$dlext"
+    run(`g++ -shared -fPIC $(Wrapper.filepath) -o $libpath`)
+    @test isfile(libpath)
+    dlopen(libpath)
+    Wrapper.hello("world")
+end
 
 end#module
