@@ -183,7 +183,7 @@ julia> cxxtypename(Int8)
 ```
 """
 function cxxtypename end
-cxxtypename(::Type{Cvoid}) = "void"
+
 
 export Convert
 struct Convert{From,To} end
@@ -222,13 +222,28 @@ end
 
 function ArgAnn(julia_type::Type)
     cxx_type = cxxtypename(julia_type)
+    initial_julia_type = julia_type
     ArgAnn(julia_type,
         cxx_type,
-        julia_type,
+        initial_julia_type,
         identity,
         false
     )
 end
+
+function arg_ann_cstring(julia_type)
+    cxx_type = cxxtypename(julia_type)
+    initial_julia_type = AbstractString
+    ArgAnn(julia_type,
+           cxx_type,
+           initial_julia_type,
+           identity,
+           false
+    )
+end
+
+ArgAnn(julia_type::Type{Cstring}) = arg_ann_cstring(Cstring)
+ArgAnn(julia_type::Type{Cwstring}) = arg_ann_cstring(Cwstring)
 
 function cxxtypename(::Type{Ptr{T}}) where {T}
     cxxtypename(T) * "*"
@@ -245,7 +260,16 @@ function destar(str::AbstractString)
     end
 end
 
-for (julia_type, cxx_type) in pairs(cxxtype)
+# TODO remove patch when CxxInterface has these
+const cxxtype_patched = merge(cxxtype,
+    Dict(
+        Cvoid    => "void",
+        Cstring  => "char*",
+        Cwstring => "wchar*",
+    )
+)
+
+for (julia_type, cxx_type) in pairs(cxxtype_patched)
     @eval cxxtypename(::Type{$julia_type}) = $cxx_type
 end
 

@@ -1,6 +1,10 @@
 import CxxCall
 using Test
 
+include("test_hello_world.jl")
+include("test_AddCxx.jl")
+include("test_StdVector.jl")
+include("test_shared_ptr.jl")
 
 @testset "parse_fdef" begin
     parse_fdef = CxxCall.parse_fdef
@@ -37,6 +41,3 @@ using Test
     ]
 end
 
-include("test_AddCxx.jl")
-include("test_StdVector.jl")
-include("test_shared_ptr.jl")
