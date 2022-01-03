@@ -15,7 +15,7 @@ module Wrapper
     struct StdVector{T} <: AbstractVector{T}
         ptr::Ptr{StdVector{T}}
     end
-    CxxCall.cxxtypename(::Type{StdVector{T}}) where {T} = "std::vector<$(cxxtypename(T))>*"
+    CxxCall.tocxx(::Type{StdVector{T}}) where {T} = "std::vector<$(tocxx(T))>*"
     # CxxCall.ArgAnn(::Type{StdVector{T}}) where {T} = ArgAnn()
     Base.size(o::StdVector) = (length(o),)
     function Base.getindex(o::StdVector, i::Integer)
@@ -24,7 +24,7 @@ module Wrapper
     end
 
     for T in (Float32,Float64,Bool)
-        vectorT = cxxtypename(StdVector{T})
+        vectorT = tocxx(StdVector{T})
         StdVector{T}() = new_StdVector(T)
         @cxx lib function new_StdVector(::Type{T})::StdVector{T}
             """

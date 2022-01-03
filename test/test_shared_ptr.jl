@@ -27,7 +27,7 @@ module Wrapper
     """))
 
     struct S end
-    CxxCall.cxxtypename(::Type{S}) = "S"
+    CxxCall.tocxx(::Type{S}) = "S"
     @cxx lib function cxxnew(::Type{S}, value::Cint)::Ptr{S}
         """
         S* ret = new S(value);
@@ -37,13 +37,13 @@ module Wrapper
     @cxx lib free(self::Ptr{S})::Cvoid = "delete self;"
 
     struct SharedPtr{T} end
-    function CxxCall.cxxtypename(::Type{SharedPtr{T}}) where {T}
-        "std::shared_ptr<$(cxxtypename(T))>"
+    function CxxCall.tocxx(::Type{SharedPtr{T}}) where {T}
+        "std::shared_ptr<$(tocxx(T))>"
     end
     for T in [S]
         @cxx lib function cxxnew(::Type{SharedPtr{T}}, obj::Ptr{T})::Ptr{SharedPtr{T}}
             """
-            $(cxxtypename(SharedPtr{T}))* ret = new $(cxxtypename(SharedPtr{T}))(nullptr);
+            $(tocxx(SharedPtr{T}))* ret = new $(tocxx(SharedPtr{T}))(nullptr);
             ret->reset(obj);
             return ret;
             """
@@ -53,7 +53,7 @@ module Wrapper
     end
 
     struct ShareHolder end
-    CxxCall.cxxtypename(::Type{ShareHolder}) = "ShareHolder"
+    CxxCall.tocxx(::Type{ShareHolder}) = "ShareHolder"
     @cxx lib function free(self::Ptr{ShareHolder})::Cvoid
         "delete self;"
     end
@@ -76,7 +76,7 @@ module Wrapper
 
     #     @cxx lib function new_SharedPtr(::Type{T})::SharedPtr{T}
     #         """
-    #         return new $(destar(cxxtypename(SharedPtr{T}))) (nullptr);
+    #         return new $(destar(tocxx(SharedPtr{T}))) (nullptr);
     #         """
     #     end
     #     @cxx lib function reset(self::SharedPtr{T}, t::T)::Cvoid
@@ -91,13 +91,13 @@ module Wrapper
     #     ret = new_SharedPtr(T);
     #     reset(ret, t)
     # end
-    # function CxxCall.cxxtypename(::Type{SharedPtr{T}}) where {T}
-    #     "std::shared_ptr<$(destar(cxxtypename(T)))>*"
+    # function CxxCall.tocxx(::Type{SharedPtr{T}}) where {T}
+    #     "std::shared_ptr<$(destar(tocxx(T)))>*"
     # end
     # for T in [S]
     #     @cxx lib function new_SharedPtr(::Type{T})::SharedPtr{T}
     #         """
-    #         return new $(destar(cxxtypename(SharedPtr{T}))) (nullptr);
+    #         return new $(destar(tocxx(SharedPtr{T}))) (nullptr);
     #         """
     #     end
     #     @cxx lib function reset(self::SharedPtr{T}, t::T)::Cvoid

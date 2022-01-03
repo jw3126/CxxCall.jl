@@ -2,7 +2,7 @@ module CxxCall
 export @cxx
 using CxxInterface
 export cxxsetup, cxxnewfile
-export cxxtypename
+export tocxx
 
 # compat
 
@@ -17,9 +17,15 @@ end
 # parser
 
 function parse_fdef(ex)
-    if Meta.isexpr(ex, :function) || Meta.isexpr(ex, Symbol("="))
+    if Meta.isexpr(ex, :where)
+        msg = """
+        Function definitions with where clause are not supported.
+        """
+        throw(ArgumentError(msg))
+    elseif Meta.isexpr(ex, :function) || Meta.isexpr(ex, Symbol("="))
         @assert length(ex.args) == 2
         ann_call, body = ex.args
+        check_body(body)
         (;parse_call_with_rettype(ann_call)..., body)
     else
         msg = """
@@ -99,7 +105,7 @@ function make_cname(fun, res::FnResult, args::Vector{FnArg})
 end
 
 function make_cxxfunction(fun, lib, return_type, args, anns, body)
-    fres = FnResult(return_type, cxxtypename(return_type))
+    fres = FnResult(return_type, tocxx(return_type))
     fargs = map(args, anns) do arg, ann
         FnArg(arg, ArgAnn(ann))
     end
@@ -108,10 +114,24 @@ function make_cxxfunction(fun, lib, return_type, args, anns, body)
     cxxfunction(fname, fres, fargs, body)
 end
 
+function check_body(ex)
+    @nospecialize
+    if Meta.isexpr(ex, :return)
+        error("""
+              Body of @cxx function should not contain return statement. Found
+              $ex
+              """)
+    elseif ex isa Expr
+        for arg in ex.args
+            check_body(arg)
+        end
+    end
+end
+
 function cxxexprmacro(lib, ex)
     def = parse_fdef(ex)
     fun = if Meta.isexpr(def.fun, :curly)
-        # error("Function names with curly brackets Foo{T} are currently not supported.")
+        error("Function names with curly brackets Foo{T} are currently not supported.")
         # the problem is that these usually are Type{...} but CxxInterface only supports
         # Union{Symbol, Expr}
         Expr(:block, def.fun)
@@ -132,7 +152,9 @@ function cxxexprmacro(lib, ex)
     anns = Expr(:vect,
         map(arg->arg.ann, def.args)...
     )
-    body = def.body
+    @assert Meta.isexpr(def.body, :block)
+    # wrap body in let expr so assignments don't leak into outer scope
+    body = Expr(:let, Expr(:block,),def.body)
     ret = Expr(:call, make_cxxfunction,
          fun, lib, return_type, args, anns, body
     )
@@ -169,20 +191,20 @@ function CxxInterface.FnArg(julia_name::Symbol, arg::ArgAnn)
 end
 
 """
-    cxxtypename(::Type{MyJuliaType})::AbstractString
+    tocxx(::Type{MyJuliaType})::String
 
 Return the corresponding C++ type as a string from the julia type.
 ```jldoctest
-julia> using CxxCall: cxxtypename
+julia> using CxxCall: tocxx
 
-julia> cxxtypename(Float64)
+julia> tocxx(Float64)
 "double"
 
-julia> cxxtypename(Int8)
+julia> tocxx(Int8)
 "int8_t"
 ```
 """
-function cxxtypename end
+function tocxx end
 
 
 export Convert
@@ -200,7 +222,7 @@ end
 
 function ArgAnn(convert_from_initial::Convert)
     initial_julia_type, julia_type = from_to(convert_from_initial)
-    cxx_type = cxxtypename(julia_type)
+    cxx_type = tocxx(julia_type)
     convert_from_initial = Convert{initial_julia_type, julia_type}()
     ArgAnn(julia_type,
         cxx_type,
@@ -221,7 +243,7 @@ function ArgAnn(julia_type::Type{Type{T}}) where {T}
 end
 
 function ArgAnn(julia_type::Type)
-    cxx_type = cxxtypename(julia_type)
+    cxx_type = tocxx(julia_type)
     initial_julia_type = julia_type
     ArgAnn(julia_type,
         cxx_type,
@@ -232,7 +254,7 @@ function ArgAnn(julia_type::Type)
 end
 
 function arg_ann_cstring(julia_type)
-    cxx_type = cxxtypename(julia_type)
+    cxx_type = tocxx(julia_type)
     initial_julia_type = AbstractString
     ArgAnn(julia_type,
            cxx_type,
@@ -245,8 +267,8 @@ end
 ArgAnn(julia_type::Type{Cstring}) = arg_ann_cstring(Cstring)
 ArgAnn(julia_type::Type{Cwstring}) = arg_ann_cstring(Cwstring)
 
-function cxxtypename(::Type{Ptr{T}}) where {T}
-    cxxtypename(T) * "*"
+function tocxx(::Type{Ptr{T}}) where {T}
+    tocxx(T) * "*"
 end
 
 function destar(str::AbstractString)
@@ -270,7 +292,7 @@ const cxxtype_patched = merge(cxxtype,
 )
 
 for (julia_type, cxx_type) in pairs(cxxtype_patched)
-    @eval cxxtypename(::Type{$julia_type}) = $cxx_type
+    @eval tocxx(::Type{$julia_type})::String = $cxx_type
 end
 
 end

@@ -6,6 +6,32 @@ include("test_AddCxx.jl")
 include("test_StdVector.jl")
 include("test_shared_ptr.jl")
 
+@testset "tocxx" begin
+    for T in [
+        Cstring,
+        Cuchar,
+        Cuint,
+        Cchar,
+        Cdouble,                   
+        Cfloat,                  
+        Cvoid,
+        Cwchar_t,
+        Cint,                  
+        Cptrdiff_t,
+        Clong,
+        Clonglong,
+        Cssize_t,
+        Culong,
+        Csize_t,    
+        Cshort,    
+        Cwstring,
+        Culonglong,
+        Cushort,
+       ]
+        @test CxxCall.tocxx(T) isa String
+    end
+end
+
 @testset "parse_fdef" begin
     parse_fdef = CxxCall.parse_fdef
 
@@ -39,5 +65,21 @@ include("test_shared_ptr.jl")
      (val = :x, ann = :X),
      (val = :y, ann = :Y),
     ]
+
+    ex = :(function f(
+            x::X,
+            y::Y)::Z
+                for i in 1:10
+                    return i
+                end
+            end
+    )
+    @test_throws Exception parse_fdef(ex)
+
+    ex = :(function f(
+            y::Y)::Z where {Y}
+            end
+    )
+    @test_throws Exception parse_fdef(ex)
 end
 
