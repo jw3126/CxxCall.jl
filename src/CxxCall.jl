@@ -1,5 +1,9 @@
 module CxxCall
+
+#@nospecialize
+
 export @cxx
+export @cxxexpr
 using CxxInterface
 export cxxsetup, cxxnewfile
 export tocxx
@@ -109,7 +113,7 @@ function make_cname(fun, res::FnResult, args::Vector{FnArg})
 end
 
 function make_cxxfunction(fun, lib, return_type, args, anns, body)
-    fres = FnResult(return_type, tocxx(return_type))
+    fres = FnResult(RetAnn(return_type))
     fargs = map(args, anns) do arg, ann
         FnArg(arg, ArgAnn(ann))
     end
@@ -139,6 +143,8 @@ function cxxexprmacro(lib, ex)
         # the problem is that these usually are Type{...} but CxxInterface only supports
         # Union{Symbol, Expr}
         Expr(:block, def.fun)
+    elseif Meta.isexpr(def.fun, Symbol("\$"))
+        only(def.fun.args)
     else
         QuoteNode(def.fun)
     end
@@ -173,6 +179,16 @@ macro cxx(lib, ex)
     esc(cxxmacro(lib, ex))
 end
 
+macro cxxexpr(lib, ex)
+    esc(cxxexprmacro(lib, ex))
+end
+
+"""
+    ArgAnn
+
+ArgAnn is short for "argument annotation". 
+It is used for customizing `@cxx` function argument handling.
+"""
 struct ArgAnn
     julia_type::Type
     cxx_type::AbstractString
@@ -181,6 +197,30 @@ struct ArgAnn
     skip::Bool
 end
 ArgAnn(o::ArgAnn) = o
+function ArgAnn(;
+    julia_type::Type,
+    cxx_type::AbstractString=tocxx(julia_type),
+    initial_julia_type::Type=julia_type,
+    convert_from_initial::Any=identity,
+    skip::Bool=false,
+    )
+    ArgAnn(
+        julia_type,
+        cxx_type,
+        initial_julia_type,
+        convert_from_initial,
+        skip::Bool
+    )
+end
+function Base.show(io::IO, o::ArgAnn)
+    print(io, ArgAnn)
+    println(io,"(")
+    println(io, "  julia_type           =  ", o.julia_type, ",")
+    println(io, "  cxx_type             =  ", o.cxxtype, ",")
+    println(io, "  initial_julia_type   =  ", o.initial_julia_type, ",")
+    println(io, "  convert_from_initial =  ", o.convert_from_initial, ",")
+    print(io, "  skip                 =  ", o.skip, ")")
+end
 
 function CxxInterface.FnArg(julia_name::Symbol, arg::ArgAnn)
     cxx_name = string(julia_name)
@@ -191,6 +231,37 @@ function CxxInterface.FnArg(julia_name::Symbol, arg::ArgAnn)
           arg.initial_julia_type,
           arg.convert_from_initial,
           ;arg.skip,
+    )
+end
+
+"""
+    RetAnn
+
+RetAnn is short for "return annotation". 
+It is used for customizing `@cxx` return value handling.
+"""
+struct RetAnn
+    julia_type::Type
+    cxx_type::AbstractString
+    final_julia_type::Type
+    convert_to_final::Any
+end
+function CxxInterface.FnResult(o::RetAnn)
+    FnResult(o.julia_type, o.cxx_type, o.final_julia_type, o.convert_to_final)
+end
+RetAnn(o::RetAnn) = o
+RetAnn(T::Type) = RetAnn(julia_type=T)
+function RetAnn(;
+    julia_type::Type,
+    cxx_type::AbstractString=tocxx(julia_type),
+    final_julia_type::Type=julia_type,
+    convert_to_final::Any=identity,
+    )
+    RetAnn(
+        julia_type,
+        cxx_type,
+        final_julia_type,
+        convert_to_final,
     )
 end
 
@@ -212,59 +283,46 @@ function tocxx end
 
 
 export Convert
-struct Convert{From,To} end
-function (o::Convert{From,To})(expr) where {From,To}
+struct Convert
+    FromTo::Pair{Type,Type}
+end
+function (o::Convert)(expr)
+    From, To = o.FromTo
     :(convert($To,$expr::$From))
-end
-function from_to(::Convert{From,To}) where {From, To}
-    From, To
-end
-function Convert(from_to::Pair)
-    From, To = from_to
-    Convert{From, To}()
 end
 
 function ArgAnn(convert_from_initial::Convert)
-    initial_julia_type, julia_type = from_to(convert_from_initial)
+    initial_julia_type, julia_type = convert_from_initial.FromTo
     cxx_type = tocxx(julia_type)
-    convert_from_initial = Convert{initial_julia_type, julia_type}()
-    ArgAnn(julia_type,
+    convert_from_initial = Convert(initial_julia_type=>julia_type)
+    ArgAnn(;julia_type,
         cxx_type,
         initial_julia_type,
         convert_from_initial,
-        false
     )
 end
 
-function ArgAnn(julia_type::Type{Type{T}}) where {T}
-    cxx_type = "void*"
-    ArgAnn(Ptr{Cvoid},
-        cxx_type,
-        julia_type,
-        Returns(:(C_NULL)),
-        false
+function ArgAnn(initial_julia_type::Type{Type{T}}) where {T}
+    ArgAnn(;julia_type=Ptr{Cvoid},
+        cxx_type="void*",
+        initial_julia_type=Type{T},
+        convert_from_initial=Returns(:(C_NULL)),
     )
 end
 
-function ArgAnn(julia_type::Type)
-    cxx_type = tocxx(julia_type)
-    initial_julia_type = julia_type
-    ArgAnn(julia_type,
-        cxx_type,
+function ArgAnn(initial_julia_type::Type)
+    ArgAnn(;julia_type=initial_julia_type,
+        cxx_type=tocxx(initial_julia_type),
         initial_julia_type,
-        identity,
-        false
     )
 end
 
 function arg_ann_cstring(julia_type)
     cxx_type = tocxx(julia_type)
-    initial_julia_type = AbstractString
-    ArgAnn(julia_type,
+    initial_julia_type = Union{AbstractString, julia_type}
+    ArgAnn(;julia_type,
            cxx_type,
            initial_julia_type,
-           identity,
-           false
     )
 end
 

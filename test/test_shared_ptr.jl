@@ -1,7 +1,6 @@
 module TestSharedPtr
 module Wrapper
     using CxxCall
-    using CxxCall: destar
     dir = mktempdir()
     lib = joinpath(dir, "libSharedPtr")
     filepath = joinpath(dir, "SharedPtrCxx.cxx")

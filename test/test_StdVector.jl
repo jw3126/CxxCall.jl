@@ -2,7 +2,6 @@ module TestStdVector
 
 module Wrapper
     using CxxCall
-    using CxxCall: destar
     dir = mktempdir()
     lib = joinpath(dir, "libStdVectorCxx")
     filepath = joinpath(dir, "StdVectorCxx.cxx")
@@ -21,6 +20,10 @@ module Wrapper
     function Base.getindex(o::StdVector, i::Integer)
         @boundscheck checkbounds(o,i)
         at(o, Csize_t(i-1))
+    end
+    function destar(x::AbstractString)
+        @assert x[end] == '*'
+        x[begin:end-1]
     end
 
     for T in (Float32,Float64,Bool)
