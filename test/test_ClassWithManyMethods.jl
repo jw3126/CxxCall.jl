@@ -13,7 +13,7 @@ eval(cxxnewfile(filepath,
 template <typename T>
 struct ClassWithManyMethods {
     T number;
-    T exact()      {return number+0;}
+    T zero_more()      {return number+0;}
     T one_more()   {return number+1;}
     T two_more()   {return number+2;}
     T three_more() {return number+3;}
@@ -28,7 +28,7 @@ function CxxCall.tocxx(::Type{ClassWithManyMethods{T}}) where {T}
     "ClassWithManyMethods<$(tocxx(T))>"
 end
 for T in [Int, Float64]
-    @cxx lib exact(self::ClassWithManyMethods{T})::T = "return self.exact();"
+    @cxx lib zero_more(self::ClassWithManyMethods{T})::T = "return self.zero_more();"
     # lets define the other methods in a loop
     for f in [
         :one_more,
@@ -58,7 +58,7 @@ end
     dlopen(libpath)
     
     obj = ClassWithManyMethods(42)
-    @test exact(obj)      === 42+0
+    @test zero_more(obj)  === 42+0
     @test one_more(obj)   === 42+1
     @test two_more(obj)   === 42+2
     @test three_more(obj) === 42+3
@@ -66,7 +66,7 @@ end
     @test five_more(obj)  === 42+5
 
     obj = ClassWithManyMethods(42.0)
-    @test exact(obj)      === 42.0+0
+    @test zero_more(obj)  === 42.0+0
     @test one_more(obj)   === 42.0+1
     @test two_more(obj)   === 42.0+2
     @test three_more(obj) === 42.0+3

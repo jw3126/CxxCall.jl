@@ -3,47 +3,64 @@ module TestStdVector
 module Wrapper
     using CxxCall
     dir = mktempdir()
-    lib = joinpath(dir, "libStdVectorCxx")
-    filepath = joinpath(dir, "StdVectorCxx.cxx")
+    lib = joinpath(dir, "libStdVector")
+    filepath = joinpath(dir, "StdVector.cxx")
     eval(cxxsetup())
     eval(cxxnewfile(filepath,
     """
     #include <vector>
     """))
 
-    struct StdVector{T} <: AbstractVector{T}
-        ptr::Ptr{StdVector{T}}
+    struct StdVectorTag{T} end
+    CxxCall.tocxx(::Type{StdVectorTag{T}}) where {T} = "std::vector<$(tocxx(T))>"
+
+    mutable struct StdVector{T} <: AbstractVector{T}
+        ptr::Ptr{StdVectorTag{T}}
+        function StdVector{T}() where {T}
+            ptr = cxxnew(StdVectorTag{T})
+            ret = new{T}(ptr)
+            finalizer(ret) do self
+                free(self.ptr)
+            end
+            return ret
+        end
     end
-    CxxCall.tocxx(::Type{StdVector{T}}) where {T} = "std::vector<$(tocxx(T))>*"
-    # CxxCall.ArgAnn(::Type{StdVector{T}}) where {T} = ArgAnn()
-    Base.size(o::StdVector) = (length(o),)
+    function Base.size(o::StdVector) 
+        GC.@preserve o begin
+            (Int(len(o.ptr)),)
+        end
+    end
     function Base.getindex(o::StdVector, i::Integer)
         @boundscheck checkbounds(o,i)
-        at(o, Csize_t(i-1))
+        GC.@preserve o begin
+            at(o.ptr, Csize_t(i-1))
+        end
     end
-    function destar(x::AbstractString)
-        @assert x[end] == '*'
-        x[begin:end-1]
+    function Base.push!(o::StdVector, val)
+        valT = convert(eltype(o), val)
+        GC.@preserve o begin
+            push_back(o.ptr, valT)
+        end
+        valT
     end
 
     for T in (Float32,Float64,Bool)
-        vectorT = tocxx(StdVector{T})
-        StdVector{T}() = new_StdVector(T)
-        @cxx lib function new_StdVector(::Type{T})::StdVector{T}
+        Self = Ptr{StdVectorTag{T}}
+        @cxx lib function cxxnew(::Type{StdVectorTag{T}})::Ptr{StdVectorTag{T}}
             """
-            return new $(destar(vectorT))();
+            return new std::vector<$(tocxx(T))>();
             """
         end
-        @cxx lib function free(self::StdVector{T})::Nothing
+        @cxx lib function free(self::Self)::Nothing
             "delete self;"
         end
-        @cxx lib function at(self::StdVector{T}, i::Csize_t)::T
+        @cxx lib function at(self::Self, i::Csize_t)::T
             "return self->at(i);"
         end
-        @cxx lib function Base.push!(self::StdVector{T}, val::T)::Nothing
+        @cxx lib function push_back(self::Self, val::T)::Nothing
             "self->push_back(val);"
         end
-        @cxx lib function Base.length(self::StdVector{T})::Int64
+        @cxx lib function len(self::Self)::Int64
             "return self->size();"
         end
     end
@@ -68,7 +85,6 @@ import .Wrapper; const W = Wrapper
     @test v[1] === 10f0
     @test v[2] === 20f0
     @test v[3] === 30f0
-    W.free(v)
     
     v = W.StdVector{Float64}()
     push!(v, 10.0)
@@ -77,7 +93,6 @@ import .Wrapper; const W = Wrapper
     @test collect(v) == [10.0, 20.0, 30.0]
     @test size(v) == (3,)
     @test eltype(v) == Float64
-    W.free(v)
 end
 
 end#module
