@@ -11,6 +11,9 @@ module Wrapper
     #include <vector>
     """))
 
+    # we will be dealing with pointers to std::vector<T>
+    # we could represent these using Ptr{Cvoid}
+    # however it is more safe and convenient to tag them
     struct StdVectorTag{T} end
     CxxCall.tocxx(::Type{StdVectorTag{T}}) where {T} = "std::vector<$(tocxx(T))>"
 
@@ -45,22 +48,21 @@ module Wrapper
     end
 
     for T in (Float32,Float64,Bool)
-        Self = Ptr{StdVectorTag{T}}
         @cxx lib function cxxnew(::Type{StdVectorTag{T}})::Ptr{StdVectorTag{T}}
             """
             return new std::vector<$(tocxx(T))>();
             """
         end
-        @cxx lib function free(self::Self)::Nothing
+        @cxx lib function free(self::Ptr{StdVectorTag{T}})::Nothing
             "delete self;"
         end
-        @cxx lib function at(self::Self, i::Csize_t)::T
+        @cxx lib function at(self::Ptr{StdVectorTag{T}}, i::Csize_t)::T
             "return self->at(i);"
         end
-        @cxx lib function push_back(self::Self, val::T)::Nothing
+        @cxx lib function push_back(self::Ptr{StdVectorTag{T}}, val::T)::Nothing
             "self->push_back(val);"
         end
-        @cxx lib function len(self::Self)::Int64
+        @cxx lib function len(self::Ptr{StdVectorTag{T}})::Int64
             "return self->size();"
         end
     end
@@ -69,7 +71,7 @@ end#module Wrapper
 using Test
 import .Wrapper; const W = Wrapper
 
-@testset "StdVector" begin
+@testset "std::vector" begin
     @test !ispath(W.filepath)
     W.cxx_write_code!()
     @test isfile(W.filepath)

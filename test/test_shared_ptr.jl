@@ -75,7 +75,7 @@ end#module Wrapper
 
 using Test
 import .Wrapper; const W = Wrapper
-@testset "shared_ptr" begin
+@testset "std::shared_ptr" begin
     @test !ispath(W.filepath)
     W.cxx_write_code!()
     @test isfile(W.filepath)
