@@ -1,7 +1,7 @@
 name = "CxxCall"
 uuid = "dbaf2c2e-b61b-429c-b386-57175d7288fb"
 authors = ["Jan Weidner <jw3126@gmail.com> and contributors"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 CxxInterface = "62027b0a-52e9-423e-ab47-e314c210e772"
